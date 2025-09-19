@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yıldız Anket A.Ş. - Gelecek Konserler Anketi</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .container {
+            transition: all 0.5s ease-in-out;
+        }
+        #loading-indicator {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+        #error-message {
+            background-color: #fee2e2;
+            color: #b91c1c;
+            border: 1px solid #ef4444;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1.5rem;
+        }
+        /* Özel animasyonlar */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .animate-fadeInUp {
+            animation: fadeInUp 0.6s ease-out forwards;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-indigo-500 to-purple-600 min-h-screen flex items-center justify-center p-4">
+
+    <!-- Yükleniyor Göstergesi -->
+    <div id="loading-indicator">
+        <svg class="animate-spin -ml-1 mr-3 h-10 w-10 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+    </div>
+
+    <!-- Ana Konteyner -->
+    <div id="main-container" class="container bg-white p-8 rounded-2xl shadow-2xl w-full max-w-xl hidden">
+
+        <!-- Hata Mesajı -->
+        <div id="error-message" class="hidden"></div>
+
+        <!-- Giriş Bölümü -->
+        <div id="entry-page">
+            <h1 class="text-4xl font-extrabold text-center text-gray-900 mb-6 tracking-wide animate-fadeInUp" style="animation-delay: 0.1s;">YILDIZ ANKET A.Ş.</h1>
+            <p class="text-center text-gray-600 mb-8 animate-fadeInUp" style="animation-delay: 0.3s;">Lütfen anketimize başlamak için bilgilerinizi giriniz.</p>
+
+            <form id="entry-form" class="space-y-6">
+                <div class="animate-fadeInUp" style="animation-delay: 0.5s;">
+                    <label for="name" class="block text-sm font-medium text-gray-700">Ad Soyad</label>
+                    <input type="text" id="name" name="name" required class="mt-1 block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 transition duration-300">
+                </div>
+                <div class="animate-fadeInUp" style="animation-delay: 0.7s;">
+                    <label for="email" class="block text-sm font-medium text-gray-700">E-posta</label>
+                    <input type="email" id="email" name="email" required class="mt-1 block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 transition duration-300">
+                </div>
+                <button type="submit" class="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-300 animate-fadeInUp" style="animation-delay: 0.9s;">
+                    Devam
+                </button>
+            </form>
+        </div>
+
+        <!-- Anket Bölümü (Başlangıçta Gizli) -->
+        <div id="survey-page" class="hidden">
+            <h2 class="text-3xl font-bold text-center text-gray-900 mb-6">Yıldız Anket A.Ş. – Gelecek Konserler Anketi</h2>
+            
+            <form id="survey-form">
+                <div id="questions-container" class="space-y-8 mb-8">
+                    <!-- Sorular buraya dinamik olarak eklenecek -->
+                </div>
+                <div id="form-status" class="text-center my-4 font-semibold"></div>
+                <button id="submit-btn" type="submit" class="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition duration-300">
+                    Anketi Tamamla
+                </button>
+            </form>
+        </div>
+
+        <!-- Teşekkür Bölümü (Başlangıçta Gizli) -->
+        <div id="thank-you-page" class="hidden text-center">
+            <h2 class="text-3xl font-bold text-gray-900 mb-4">Teşekkür Ederiz!</h2>
+            <p class="text-gray-600 text-lg">Anketimize katıldığınız için teşekkür ederiz. Cevaplarınız bizim için çok değerli.</p>
+        </div>
+
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        
+        // Firestore loglarını açarak konsolda hata ayıklama bilgilerini görmenizi sağlar.
+        setLogLevel('debug');
+
+        // Firebase yapılandırma bilgileri. Bu bilgiler, Firebase projenize özgüdür.
+        const firebaseConfig = {
+            apiKey: "AIzaSyCqErDbUFTQhJpoLtG4C_5iNL9UxYtZKts",
+            authDomain: "anket-e6e30.firebaseapp.com",
+            projectId: "anket-e6e30",
+            storageBucket: "anket-e6e30.firebasestorage.app",
+            messagingSenderId: "161818192550",
+            appId: "1:161818192550:web:e01ba816112fe217bea267",
+            measurementId: "G-8MJGH8CVF6"
+        };
+
+        // Firebase servislerini başlatma
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        let userId = null;
+        let isAuthReady = false;
+
+        const mainContainer = document.getElementById('main-container');
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const errorMessageDiv = document.getElementById('error-message');
+
+        // Kullanıcı kimlik doğrulama durumunu dinleme.
+        // Bu listener, kullanıcı anonim olarak giriş yaptığında veya oturumu kapattığında çalışır.
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                // Kullanıcı kimliği başarıyla alındıysa, userId değişkenini güncelle.
+                userId = user.uid;
+                console.log("Kullanıcı kimliği alındı:", userId);
+            } else {
+                try {
+                    // Firebase projesinde anonim giriş etkin değilse, bu kod bloğu hata fırlatır.
+                    await signInAnonymously(auth);
+                    console.log("Anonim kullanıcı girişi yapıldı.");
+                } catch (error) {
+                    // Hata oluşursa, kullanıcıya anlaşılır bir hata mesajı göster.
+                    console.error("Kimlik doğrulama hatası:", error);
+                    errorMessageDiv.textContent = "Kimlik doğrulama hatası oluştu. Lütfen Firebase projenizde 'Authentication' > 'Sign-in method' bölümünden 'Anonymous' giriş yöntemini etkinleştirdiğinizden emin olun.";
+                    errorMessageDiv.classList.remove('hidden');
+                    loadingIndicator.classList.add('hidden');
+                    mainContainer.classList.remove('hidden');
+                    return;
+                }
+            }
+            // Kimlik doğrulama işlemi tamamlandığında, isAuthReady'i true yap ve yükleme ekranını gizle.
+            isAuthReady = true;
+            loadingIndicator.classList.add('hidden');
+            mainContainer.classList.remove('hidden');
+        });
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            const entryPage = document.getElementById('entry-page');
+            const surveyPage = document.getElementById('survey-page');
+            const thankYouPage = document.getElementById('thank-you-page');
+            const entryForm = document.getElementById('entry-form');
+            const surveyForm = document.getElementById('survey-form');
+            const submitBtn = document.getElementById('submit-btn');
+            const questionsContainer = document.getElementById('questions-container');
+            const formStatus = document.getElementById('form-status');
+
+            // Soruların verisini tanımla
+            const questions = [
+                {
+                    type: 'open',
+                    question: '1. En son hangi konsere gittiniz ve bu konser hakkındaki düşünceleriniz nelerdir?',
+                    name: 'q1'
+                },
+                {
+                    type: 'multiple-choice',
+                    question: '2. En çok hangi müzik türünde konserlere katılmayı seversiniz?',
+                    name: 'q2',
+                    options: ['Rock', 'Pop', 'Hip-Hop / Rap', 'Elektronik Müzik', 'Klasik Müzik', 'Caz / Blues', 'Diğer']
+                },
+                {
+                    type: 'open',
+                    question: '3. Gelecek konserler için Türkiye\'ye gelmesini en çok istediğiniz 3 sanatçı veya grubu yazar mısınız?',
+                    name: 'q3'
+                },
+                {
+                    type: 'multiple-choice',
+                    question: '4. Konser bileti satın alırken sizin için en önemli faktör nedir?',
+                    name: 'q4',
+                    options: ['Sanatçının Popülaritesi', 'Bilet Fiyatı', 'Konserin Mekanı', 'Konser Tarihi / Saati']
+                },
+                {
+                    type: 'multiple-choice',
+                    question: '5. Konser biletlerini genellikle nereden satın alırsınız?',
+                    name: 'q5',
+                    options: ['Resmi Bilet Satış Siteleri', 'Sanatçının Kendi Web Sitesi', 'Sosyal Medya Duyuruları', 'Arkadaş Tavsiyesi']
+                },
+                {
+                    type: 'open',
+                    question: '6. Konser mekanlarında ne gibi iyileştirmeler yapılmasını istersiniz?',
+                    name: 'q6'
+                },
+                {
+                    type: 'multiple-choice',
+                    question: '7. Konserlere giderken yanınızda kimlerle gitmeyi tercih edersiniz?',
+                    name: 'q7',
+                    options: ['Yalnız', 'Arkadaşlarla', 'Aileyle', 'Eş/Sevgiliyle']
+                },
+                {
+                    type: 'open',
+                    question: '8. Bir konserin daha keyifli olması için hangi etkinlikler eklenmeli? (Örn: yiyecek-içecek stantları, oyun alanları)',
+                    name: 'q8'
+                },
+                {
+                    type: 'open',
+                    question: '9. Gelecekteki konserler için en çok hangi şehirde etkinlik düzenlenmesini istersiniz?',
+                    name: 'q9'
+                },
+                {
+                    type: 'multiple-choice',
+                    question: '10. Konser duyurularını en çok nereden takip ediyorsunuz?',
+                    name: 'q10',
+                    options: ['Instagram', 'X (Twitter)', 'Facebook', 'Spotify', 'Haber Siteleri', 'Diğer']
+                }
+            ];
+
+            // Soruları dinamik olarak oluşturma fonksiyonu
+            function renderQuestions() {
+                questionsContainer.innerHTML = ''; // Önceki soruları temizle
+                questions.forEach(q => {
+                    const questionDiv = document.createElement('div');
+                    questionDiv.className = 'bg-gray-50 p-6 rounded-xl shadow-inner';
+                    
+                    const questionText = document.createElement('p');
+                    questionText.className = 'text-gray-800 font-semibold mb-3';
+                    questionText.textContent = q.question;
+                    questionDiv.appendChild(questionText);
+
+                    if (q.type === 'open') {
+                        const textarea = document.createElement('textarea');
+                        textarea.name = q.name;
+                        textarea.rows = 4;
+                        textarea.className = 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 transition duration-300';
+                        textarea.placeholder = 'Cevabınızı buraya yazınız...';
+                        // Zorunluluk kaldırıldı
+                        questionDiv.appendChild(textarea);
+                    } else if (q.type === 'multiple-choice') {
+                        q.options.forEach(option => {
+                            const label = document.createElement('label');
+                            label.className = 'flex items-center space-x-2 text-gray-700 mb-2';
+                            
+                            const input = document.createElement('input');
+                            input.type = 'radio';
+                            input.name = q.name;
+                            input.value = option;
+                            // Zorunluluk kaldırıldı
+                            input.className = 'h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500 transition duration-300';
+                            
+                            const span = document.createElement('span');
+                            span.textContent = option;
+                            
+                            label.appendChild(input);
+                            label.appendChild(span);
+                            questionDiv.appendChild(label);
+                        });
+                    }
+                    questionsContainer.appendChild(questionDiv);
+                });
+            }
+
+            // Giriş formu gönderme işlemi
+            entryForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                entryPage.classList.add('hidden');
+                surveyPage.classList.remove('hidden');
+                renderQuestions(); // Soruları yükle
+            });
+
+            // Anket formu gönderme işlemi
+            surveyForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+
+                // Kullanıcı kimliği hazır değilse işlemi durdur
+                if (!isAuthReady || !userId) {
+                    formStatus.textContent = "Hata: Kimlik doğrulama henüz tamamlanmadı. Lütfen sayfayı yenileyin.";
+                    formStatus.className = "text-center my-4 font-semibold text-red-600";
+                    return;
+                }
+
+                // Butonu devre dışı bırak ve durum mesajını göster
+                submitBtn.disabled = true;
+                submitBtn.textContent = "Kaydediliyor...";
+                submitBtn.classList.add('bg-gray-400');
+                submitBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
+                formStatus.textContent = "Anketiniz kaydediliyor...";
+                formStatus.className = "text-center my-4 font-semibold text-gray-600";
+                
+                const formData = new FormData(surveyForm);
+                const results = {};
+                for (const [name, value] of formData.entries()) {
+                    results[name] = value;
+                }
+                
+                const name = document.getElementById('name').value;
+                const email = document.getElementById('email').value;
+
+                // Firestore'a kaydedilecek veri nesnesi
+                const surveyData = {
+                    name: name,
+                    email: email,
+                    timestamp: new Date(),
+                    answers: results
+                };
+
+                try {
+                    // Veriyi Firestore'daki 'anketler/cevaplar' koleksiyonuna ekle.
+                    await addDoc(collection(db, `anketler/cevaplar/kullanici-cevaplari`), surveyData);
+                    
+                    formStatus.textContent = "Anket verileri başarıyla kaydedildi.";
+                    formStatus.className = "text-center my-4 font-semibold text-green-600";
+                    
+                    // Başarılı bir şekilde kaydedildikten sonra sayfayı değiştir
+                    setTimeout(() => {
+                        surveyPage.classList.add('hidden');
+                        thankYouPage.classList.remove('hidden');
+                    }, 1000); // Kullanıcının başarı mesajını görmesi için 1 saniye bekle
+                } catch (error) {
+                    console.error("Anket verileri kaydedilirken bir hata oluştu:", error);
+                    formStatus.textContent = `Hata: Veri kaydedilemedi. Hata kodu: ${error.code}`;
+                    formStatus.className = "text-center my-4 font-semibold text-red-600";
+                } finally {
+                    // İşlem bittiğinde butonu eski haline getir
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = "Anketi Tamamla";
+                    submitBtn.classList.remove('bg-gray-400');
+                    submitBtn.classList.add('bg-green-600', 'hover:bg-green-700');
+                }
+            });
+        });
+    </script>
+
+</body>
+</html>
